@@ -1,194 +1,159 @@
-// ignore_for_file: unused_local_variable
+// ignore_for_file: library_private_types_in_public_api
 
-import 'package:avatar_glow/avatar_glow.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:translator/translator.dart';
 
-class TextToSpeech extends StatefulWidget {
-  const TextToSpeech({super.key});
+class TextToSpeechApp extends StatefulWidget {
+  const TextToSpeechApp({super.key});
 
   @override
-  State<TextToSpeech> createState() => _TextToSpeechState();
+  _TextToSpeechAppState createState() => _TextToSpeechAppState();
 }
 
-class _TextToSpeechState extends State<TextToSpeech> {
-  TextEditingController textController = TextEditingController();
-  FlutterTts flutterTts = FlutterTts();
-  double speechRange = 0.5;
-  bool isSpeaking = false;
+class _TextToSpeechAppState extends State<TextToSpeechApp> {
+  final FlutterTts flutterTts = FlutterTts();
+  final TextEditingController textController = TextEditingController();
+  final translator = GoogleTranslator();
 
-  play() async {
-    if (textController.text.trim().isEmpty) return;
+  String selectedLanguageCode = 'en-US';
+  double speechRate = 0.5;
+  bool useFemaleVoice = true;
 
-    var translation = await translator.translate(
-      textController.text,
-      to: selectedLanguageCode,
+  final Map<String, String> languageMap = {
+    'English (US)': 'en-US',
+    'Urdu': 'ur-PK',
+    'Spanish': 'es-ES',
+    'French': 'fr-FR',
+    'German': 'de-DE',
+    'Arabic': 'ar-SA',
+    'Hindi': 'hi-IN',
+  };
+
+  @override
+  void dispose() {
+    flutterTts.stop();
+    super.dispose();
+  }
+
+  Future<void> speak() async {
+    String inputText = textController.text.trim();
+
+    if (inputText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please enter some text")),
+      );
+      return;
+    }
+
+    // Check if language is supported
+    List<dynamic> supportedLanguages = await flutterTts.getLanguages;
+    if (!supportedLanguages.contains(selectedLanguageCode)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Selected language not supported on this device")),
+      );
+      return;
+    }
+
+    // Translate text
+    Translation translation = await translator.translate(
+      inputText,
+      to: selectedLanguageCode.split('-')[0], // use only language code part
     );
 
-    await flutterTts.setLanguage(selectedLanguageCode);
-    await flutterTts.setSpeechRate(speechRange);
+    // Set voice (toggle male/female if available)
+    List<dynamic> voices = await flutterTts.getVoices;
+    var filteredVoices = voices.where((voice) =>
+        voice['locale'] == selectedLanguageCode &&
+        voice['name']
+            .toLowerCase()
+            .contains(useFemaleVoice ? 'female' : 'male'));
 
+    if (filteredVoices.isNotEmpty) {
+      await flutterTts.setVoice(filteredVoices.first);
+    }
+
+    useFemaleVoice = !useFemaleVoice;
+
+    await flutterTts.setLanguage(selectedLanguageCode);
+    await flutterTts.setSpeechRate(speechRate);
     await flutterTts.speak(translation.text);
   }
 
-  pause() async {
-    await flutterTts.pause();
-    isSpeaking = false;
-    setState(() {});
-  }
-
-  stop() async {
+  void stop() async {
     await flutterTts.stop();
-    setState(() {
-      isSpeaking = false;
-    });
   }
-
-  speech(val) {
-    speechRange = val;
-
-    flutterTts.setSpeechRate(speechRange);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    flutterTts.setStartHandler(() {
-      setState(() {
-        isSpeaking = true;
-      });
-    });
-
-    flutterTts.setCompletionHandler(() {
-      setState(() {
-        isSpeaking = false;
-      });
-    });
-
-    flutterTts.setCancelHandler(() {
-      setState(() {
-        isSpeaking = false;
-      });
-    });
-  }
-
-  final translator = GoogleTranslator();
-  String selectedLanguageCode = 'en';
-  Map<String, String> languageMap = {
-    'English': 'en',
-    'Chinese': 'zh-CN',
-    'Urdu': 'ur',
-    'Spanish': 'es',
-    'French': 'fr',
-    'German': 'de',
-    'Arabic': 'ar',
-    'Russian': 'ru',
-  };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SingleChildScrollView(
-        child: SafeArea(
-            child: Column(
+      appBar: AppBar(title: Text("Text to Speech Translator")),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
           children: [
-            SizedBox(height: 53),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 31),
-              child: DropdownButtonFormField<String>(
-                  value: selectedLanguageCode,
-                  decoration: InputDecoration(
-                    labelText: "Select Language",
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                  items: languageMap.entries
-                      .map((entery) => DropdownMenuItem(
-                          value: entery.value, child: Text(entery.key)))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedLanguageCode = value!;
-                    });
-                  }),
+            DropdownButtonFormField<String>(
+              value: selectedLanguageCode,
+              items: languageMap.entries.map((entry) {
+                return DropdownMenuItem<String>(
+                  value: entry.value,
+                  child: Text(entry.key),
+                );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => selectedLanguageCode = val);
+                }
+              },
+              decoration: InputDecoration(labelText: "Select Language"),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 24),
-              child: Container(
-                padding: EdgeInsets.all(8),
-                height: 256,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                    color: const Color.fromARGB(239, 244, 247, 247),
-                    border:
-                        Border.all(strokeAlign: BorderSide.strokeAlignOutside),
-                    borderRadius: BorderRadius.circular(15)),
-                child: TextFormField(
-                  controller: textController,
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                  ),
-                ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: textController,
+              decoration: InputDecoration(
+                labelText: "Enter text",
+                border: OutlineInputBorder(),
               ),
+              maxLines: 3,
             ),
-            SizedBox(height: 33),
-            AvatarGlow(
-              glowColor: Colors.indigoAccent,
-              animate: isSpeaking,
-              curve: Curves.fastOutSlowIn,
-              child: const Material(
-                elevation: 8.0,
-                shape: CircleBorder(),
-                color: Colors.transparent,
-                child: CircleAvatar(
-                  radius: 50.0,
-                  child: Icon(Icons.mic_none_outlined),
-                ),
-              ),
-            ),
-            SizedBox(height: 53),
+            SizedBox(height: 20),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(
-                  color: Colors.green,
-                  splashRadius: 41,
-                  iconSize: 61,
-                  onPressed: play,
-                  icon: Icon(Icons.play_circle),
+                Text("Speed:"),
+                Expanded(
+                  child: Slider(
+                    value: speechRate,
+                    onChanged: (val) {
+                      setState(() => speechRate = val);
+                    },
+                    min: 0.1,
+                    max: 1.0,
+                  ),
                 ),
-                IconButton(
-                  color: Colors.red,
-                  splashRadius: 41,
-                  iconSize: 61,
-                  onPressed: stop,
-                  icon: Icon(Icons.stop_circle),
-                ),
-                IconButton(
-                  color: Colors.yellow,
-                  splashRadius: 41,
-                  iconSize: 61,
-                  onPressed: pause,
-                  icon: Icon(Icons.pause_circle),
-                )
               ],
             ),
-            SizedBox(height: 12),
-            Text("Set speed"),
-            SizedBox(height: 12),
-            Slider(
-                max: 1,
-                value: speechRange,
-                divisions: 10,
-                label: "Set speech rate ",
-                onChanged: (value) {
-                  speech(value);
-                  setState(() {});
-                })
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: speak,
+                  icon: Icon(Icons.play_arrow),
+                  label: Text("Play"),
+                ),
+                SizedBox(width: 20),
+                ElevatedButton.icon(
+                  onPressed: stop,
+                  icon: Icon(Icons.stop),
+                  label: Text("Stop"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
           ],
-        )),
+        ),
       ),
     );
   }
