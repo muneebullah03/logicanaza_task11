@@ -29,7 +29,7 @@ class _TextToSpeechState extends State<TextToSpeech> {
     await flutterTts.setLanguage(selectedLanguageCode);
     await flutterTts.setSpeechRate(speechRange);
 
-    await flutterTts.speak(translation.text); // ✅ now speak the translated text
+    await flutterTts.speak(translation.text);
   }
 
   pause() async {
@@ -175,6 +175,8 @@ class _TextToSpeechState extends State<TextToSpeech> {
                 )
               ],
             ),
+            SizedBox(height: 12),
+            Text("Set speed"),
             SizedBox(height: 12),
             Slider(
                 max: 1,
